@@ -41,18 +41,17 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut writer = Writer::from_path("output.csv")?;
 
     for row in log_tracker.this_rocket.iter() {
-        writer.write_record(row.position.coords.as_slice().to_vec().iter().map(|&v| v.to_string()))?;
+        let (x,y,z) = row.orientation.euler_angles();
+        writer.write_record(vec![x,y,z].iter().map(|&v| v.to_string()))?;
     }
 
     writer.flush()?;
 
     let mut generate_plots = Command::new("python3");
     generate_plots.arg("plotter/plotter.py");
-    println!("test");
     
     let mut open_plots = Command::new("explorer.exe");
     open_plots.arg("plot.html");
-    println!("test");
 
     generate_plots.status().expect("Failed to execute generation command");
     open_plots.status().expect("Failed to execute file opening command");
