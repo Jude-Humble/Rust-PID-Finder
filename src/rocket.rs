@@ -123,7 +123,7 @@ impl ThrustData {
         Self {
             thrust,
             powered: true,
-            engine_orientation: Unit::new_normalize(Vector3::new(0.0,0.0,0.0)),
+            engine_orientation: Unit::new_normalize(Vector3::new(0.0,0.1,0.9)),
         }
     }
 }
@@ -189,9 +189,13 @@ impl Rocket {
         let motor_moment = self.rotational.cmp;
         let aerodynamic_moment = self.rotational.cp;
 
-        let airflow = -self.velocity.normalize();
+        let airflow = if self.velocity.norm_squared() > 1e-8 {
+            -self.velocity.normalize()
+        } else {
+            Vector3::new(0.0,0.0,0.0)
+        };
         
-        let t_force = self.thrust.engine_orientation.as_ref() * self.thrust.thrust;
+        let t_force = self.orientation.transform_vector(self.thrust.engine_orientation.as_ref()) * self.thrust.thrust;
 
         let d_torque = self.drag.fetch_rot_drag(&self.rotational.angular_velocity, &self.body.get_cross_areas(), &self.rotational.cp);
         let total_torque = motor_moment.cross(&t_force) + aerodynamic_moment.cross(&d_torque) + (-self.rotational.dampening_constant * self.rotational.angular_velocity);
@@ -219,7 +223,7 @@ impl Rocket {
                 break;
             }
 
-            let g_force = Vector3::new(0.0, 0.0, 9.81 * self.mass.current_mass);
+            let g_force = Vector3::new(0.0, 0.0, -9.81 * self.mass.current_mass);
             let d_force = self.drag.trans_drag(&self.velocity, &self.body.get_cross_areas());
 
             let t_force = if self.thrust.powered {
@@ -232,11 +236,11 @@ impl Rocket {
                 Vector3::new(0.0,0.0,0.0)
             };
 
-            self.acceleration = (g_force + t_force + d_force) / self.mass.current_mass;
+            self.acceleration = (g_force + t_force - d_force) / self.mass.current_mass;
             self.velocity += self.acceleration * self.time_step;
             self.position += self.velocity * self.time_step;
 
-            println!("{:?}", self.position);
+            println!("{:?} | {:?} | {:?} | {:?}", self.position, self.acceleration, self.velocity, self.orientation);
 
             self.rotate_physics();
 
