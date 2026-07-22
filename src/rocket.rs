@@ -3,7 +3,7 @@ use nalgebra::{Vector3, Point3, Matrix3, UnitQuaternion, matrix, Unit};
 
 /////////////////////////////////////////////////////////////////////////
 
-struct Mass {
+pub struct Mass {
     dry_mass: f32,
     wet_mass: f32,
     current_mass: f32,
@@ -23,7 +23,7 @@ impl Mass {
 
 /////////////////////////////////////////////////////////////////////////
 
-struct BodyData {
+pub struct BodyData {
     radius: f32,
     height: f32,
 }
@@ -47,9 +47,8 @@ impl BodyData {
 
 /////////////////////////////////////////////////////////////////////////
 
-struct RotationalData {
+pub struct RotationalData {
     cp: Vector3<f32>,
-    cg: Vector3<f32>,
     cmp: Vector3<f32>,
     inertia_matrix: Matrix3<f32>,
     angular_velocity: Vector3<f32>,
@@ -58,7 +57,7 @@ struct RotationalData {
 }
 
 impl RotationalData {
-    pub fn new(cp: Vector3<f32>, cg: Vector3<f32>, cmp: Vector3<f32>, dampening_constant: f32, mass: Mass, bdat: BodyData) -> Self {
+    pub fn new(cp: Vector3<f32>, cmp: Vector3<f32>, dampening_constant: f32, mass: &Mass, bdat: &BodyData) -> Self {
 
         let set_inertial_matrix = matrix! [
             ((1.0/12.0) * mass.current_mass * (3.0 * (bdat.radius.powi(2)) + (bdat.height.powi(2)))), 0.0, 0.0;
@@ -67,7 +66,7 @@ impl RotationalData {
         ];
 
         Self {
-            cp, cg, cmp, dampening_constant,
+            cp, cmp, dampening_constant,
             angular_velocity: Vector3::new(0.0, 0.0, 0.0),
             angular_acceleration: Vector3::new(0.0, 0.0, 0.0),
             inertia_matrix: set_inertial_matrix,
@@ -77,7 +76,7 @@ impl RotationalData {
 
 /////////////////////////////////////////////////////////////////////////
 
-struct DragData {
+pub struct DragData {
     drag_coefficient: Vector3<f32>,
     air_density: f32,
 }
@@ -113,18 +112,16 @@ impl DragData {
 
 /////////////////////////////////////////////////////////////////////////
 
-struct ThrustData {
+pub struct ThrustData {
     thrust: f32,
     powered: bool,
-    duration: f32,
     engine_orientation: Unit<Vector3<f32>>,
 }
 
 impl ThrustData {
-    pub fn new(thrust: f32, duration: f32) -> Self {
+    pub fn new(thrust: f32) -> Self {
         Self {
             thrust,
-            duration,
             powered: true,
             engine_orientation: Unit::new_normalize(Vector3::new(0.0,0.0,0.0)),
         }
@@ -133,7 +130,7 @@ impl ThrustData {
 
 /////////////////////////////////////////////////////////////////////////
 
-struct RocketState {
+pub struct RocketState {
     this_rocket: Vec<Rocket>,
 }
 
@@ -146,7 +143,7 @@ impl RocketState {
 /////////////////////////////////////////////////////////////////////////
 
 
-struct Rocket {
+pub struct Rocket {
     position: Point3<f32>,
     velocity: Vector3<f32>,
     acceleration: Vector3<f32>,
@@ -180,8 +177,7 @@ impl Rocket {
             mass,
             rotational,
             drag,
-            time_step,
-            sim_duration,
+            time_step, sim_duration,
             velocity: Vector3::new(0.0,0.0,0.0),
             acceleration: Vector3::new(0.0,0.0,0.0),
         }
@@ -215,7 +211,7 @@ impl Rocket {
         self.orientation *= rotational_quaternion;
     }
 
-    pub fn full_phsyics(&mut self) {
+    pub fn full_physics(&mut self) {
         let mut current_cycle: u32 = 0;
         for i in 0..self.sim_duration {
             current_cycle += 1;
@@ -228,17 +224,29 @@ impl Rocket {
 
             let t_force = if self.thrust.powered {
                 Vector3::new(
-                    self.orientation.coords.x * (self.thrust.thrust /* */),
-                    self.orientation.coords.y * (self.thrust.thrust /* */),
-                    self.orientation.coords.z * (self.thrust.thrust /* */)
+                    self.orientation.coords.x * (self.thrust.thrust * self.thrust.engine_orientation.x),
+                    self.orientation.coords.y * (self.thrust.thrust * self.thrust.engine_orientation.y),
+                    self.orientation.coords.z * (self.thrust.thrust * self.thrust.engine_orientation.z)
                 )
             } else {
                 Vector3::new(0.0,0.0,0.0)
             };
 
-            self.acceleration = (g_force + t_force  /*d_force*/) / self.mass.current_mass;
+            self.acceleration = (g_force + t_force + d_force) / self.mass.current_mass;
             self.velocity += self.acceleration * self.time_step;
             self.position += self.velocity * self.time_step;
+
+            println!("{:?}", self.position);
+
+            self.rotate_physics();
+
+            if self.mass.current_mass <= self.mass.dry_mass {
+                self.thrust.powered = false;
+            }
+
+            if self.thrust.powered {
+                self.mass.current_mass -= self.mass.delta_mass * self.time_step;
+            }
         }
     }
 }
