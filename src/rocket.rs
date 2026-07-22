@@ -224,7 +224,7 @@ impl Rocket {
         self.orientation *= rotational_quaternion;
     }
 
-    pub fn full_physics(&mut self, history_logger: &mut RocketState) {
+    pub fn full_physics(&mut self, history_logger: &mut RocketState, pid: &mut PID) {
         let mut current_cycle: u32 = 0;
         for i in 0..self.sim_duration {
             current_cycle += 1;

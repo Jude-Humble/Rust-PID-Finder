@@ -2,6 +2,7 @@ pub mod pid;
 pub mod rocket;
 
 use crate::rocket::{RocketState, RotationalData, BodyData, Mass, DragData, ThrustData, Rocket};
+use crate::pid::PID;
 use nalgebra::{Vector3, UnitQuaternion, Point3, Quaternion};
 use csv::Writer;
 use std::error::Error;
