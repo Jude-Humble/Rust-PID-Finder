@@ -3,6 +3,7 @@ use nalgebra::{Vector3, Point3, Matrix3, UnitQuaternion, matrix, Unit};
 
 /////////////////////////////////////////////////////////////////////////
 
+#[derive(Copy, Clone)]
 pub struct Mass {
     dry_mass: f32,
     wet_mass: f32,
@@ -23,6 +24,7 @@ impl Mass {
 
 /////////////////////////////////////////////////////////////////////////
 
+#[derive(Copy, Clone)]
 pub struct BodyData {
     radius: f32,
     height: f32,
@@ -47,6 +49,7 @@ impl BodyData {
 
 /////////////////////////////////////////////////////////////////////////
 
+#[derive(Copy, Clone)]
 pub struct RotationalData {
     cp: Vector3<f32>,
     cmp: Vector3<f32>,
@@ -76,6 +79,7 @@ impl RotationalData {
 
 /////////////////////////////////////////////////////////////////////////
 
+#[derive(Copy, Clone)]
 pub struct DragData {
     drag_coefficient: Vector3<f32>,
     air_density: f32,
@@ -112,6 +116,7 @@ impl DragData {
 
 /////////////////////////////////////////////////////////////////////////
 
+#[derive(Copy, Clone)]
 pub struct ThrustData {
     thrust: f32,
     powered: bool,
@@ -123,7 +128,7 @@ impl ThrustData {
         Self {
             thrust,
             powered: true,
-            engine_orientation: Unit::new_normalize(Vector3::new(0.0,0.1,0.9)),
+            engine_orientation: Unit::new_normalize(Vector3::new(0.385,0.2,0.9)),
         }
     }
 }
@@ -131,30 +136,34 @@ impl ThrustData {
 /////////////////////////////////////////////////////////////////////////
 
 pub struct RocketState {
-    this_rocket: Vec<Rocket>,
+    pub this_rocket: Vec<Rocket>,
 }
 
 impl RocketState {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self { this_rocket: Vec::new() }
+    }
+
+    fn push_new(&mut self, rocket: &Rocket) {
+        self.this_rocket.push(rocket.clone());
     }
 }
 
 /////////////////////////////////////////////////////////////////////////
 
-
+#[derive(Copy, Clone)]
 pub struct Rocket {
-    position: Point3<f32>,
-    velocity: Vector3<f32>,
-    acceleration: Vector3<f32>,
-    orientation: UnitQuaternion<f32>,
-    body: BodyData,
-    thrust: ThrustData,
-    mass: Mass,
-    rotational: RotationalData,
-    drag: DragData,
-    time_step: f32,
-    sim_duration: u32,
+    pub position: Point3<f32>,
+    pub velocity: Vector3<f32>,
+    pub acceleration: Vector3<f32>,
+    pub orientation: UnitQuaternion<f32>,
+    pub body: BodyData,
+    pub thrust: ThrustData,
+    pub mass: Mass,
+    pub rotational: RotationalData,
+    pub drag: DragData,
+    pub time_step: f32,
+    pub sim_duration: u32,
 }
 
 impl Rocket {
@@ -215,7 +224,7 @@ impl Rocket {
         self.orientation *= rotational_quaternion;
     }
 
-    pub fn full_physics(&mut self) {
+    pub fn full_physics(&mut self, history_logger: &mut RocketState) {
         let mut current_cycle: u32 = 0;
         for i in 0..self.sim_duration {
             current_cycle += 1;
@@ -240,8 +249,6 @@ impl Rocket {
             self.velocity += self.acceleration * self.time_step;
             self.position += self.velocity * self.time_step;
 
-            println!("{:?} | {:?} | {:?} | {:?}", self.position, self.acceleration, self.velocity, self.orientation);
-
             self.rotate_physics();
 
             if self.mass.current_mass <= self.mass.dry_mass {
@@ -251,6 +258,8 @@ impl Rocket {
             if self.thrust.powered {
                 self.mass.current_mass -= self.mass.delta_mass * self.time_step;
             }
+
+            history_logger.push_new(self);
         }
     }
 }
